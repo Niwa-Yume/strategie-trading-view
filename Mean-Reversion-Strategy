@@ -1,0 +1,68 @@
+//@version=5
+strategy(
+     title="Mean Reversion Strategy",
+     overlay=true,
+     default_qty_type=strategy.percent_of_equity,
+     default_qty_value=99,
+     initial_capital=1000,
+     commission_type=strategy.commission.percent,
+     commission_value=0.07
+)
+
+// ===== Inputs =====
+bollinger_period = input.int(title="Bollinger Bands Period", defval=20, minval=1)
+bollinger_stddev = input.float(title="Bollinger Bands Standard Deviation", defval=2.0, minval=0.1)
+rsi_period = input.int(title="RSI Period", defval=14, minval=1)
+rsi_oversold = input.float(title="RSI Oversold Level", defval=30.0, minval=0.0, maxval=100.0)
+rsi_overbought = input.float(title="RSI Overbought Level", defval=70.0, minval=0.0, maxval=100.0)
+rsi_exit_long = input.float(title="RSI Exit Long Level", defval=50.0, minval=0.0, maxval=100.0)
+rsi_exit_short = input.float(title="RSI Exit Short Level", defval=50.0, minval=0.0, maxval=100.0)
+trade_direction = input.string(title="Trade Direction", defval="Both", options=["Long", "Short", "Both"])
+
+// ===== Calculations =====
+// Bollinger Bands calculations
+middle_band = ta.sma(close, bollinger_period)
+band_stddev = bollinger_stddev * ta.stdev(close, bollinger_period)
+upper_band = middle_band + band_stddev
+lower_band = middle_band - band_stddev
+
+// RSI calculation
+rsi_value = ta.rsi(close, rsi_period)
+
+// Position state variables
+is_long = strategy.position_size > 0
+is_short = strategy.position_size < 0
+
+// ===== Entry Conditions =====
+long_entry_condition = (close <= lower_band) and (rsi_value < rsi_oversold)
+short_entry_condition = (close >= upper_band) and (rsi_value > rsi_overbought)
+
+// ===== Exit Conditions =====
+long_exit_condition = (close >= middle_band) and (rsi_value > rsi_exit_long)
+short_exit_condition = (close <= middle_band) and (rsi_value < rsi_exit_short)
+
+// ===== Strategy Execution =====
+if (trade_direction == "Long" or trade_direction == "Both")
+    if long_entry_condition and not is_long
+        strategy.entry(id="Long Entry", direction=strategy.long)
+    if long_exit_condition and is_long
+        strategy.exit(id="Long Exit", from_entry="Long Entry")
+
+if (trade_direction == "Short" or trade_direction == "Both")
+    if short_entry_condition and not is_short
+        strategy.entry(id="Short Entry", direction=strategy.short)
+    if short_exit_condition and is_short
+        strategy.exit(id="Short Exit", from_entry="Short Entry")
+
+// ===== Plotting =====
+plot(middle_band, title="Middle Band", color=color.orange)
+upper_band_plot = plot(upper_band, title="Upper Band", color=color.blue)
+lower_band_plot = plot(lower_band, title="Lower Band", color=color.blue)
+fill(upper_band_plot, lower_band_plot, color=color.new(color.blue, 90))
+
+// ===== Notes =====
+// This strategy utilizes Bollinger Bands and RSI to identify potential mean reversion opportunities.
+// Long positions are entered when the price touches or falls below the lower Bollinger Band and RSI indicates oversold conditions.
+// Short positions are entered when the price touches or rises above the upper Bollinger Band and RSI indicates overbought conditions.
+// Positions are exited when the price returns to the middle Bollinger Band and RSI crosses the specified exit threshold.
+// The strategy is configurable to trade Long, Short, or Both directions, and parameters are adjustable for optimization purposes.
