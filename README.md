@@ -20,7 +20,7 @@ CryptoTradingBot est un bot de trading automatisé conçu pour opérer sur les m
 ## Installation
 
 1. Clonez ce dépôt :
--
+https://github.com/Niwa-Yume/Bot-de-trading-trading-view.git
 2. Ouvrez TradingView et créez un nouveau script Pine.
 3. Copiez le contenu du fichier `stratégie` dans l'éditeur Pine de TradingView.
 
