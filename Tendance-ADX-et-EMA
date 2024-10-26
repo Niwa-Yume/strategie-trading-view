@@ -1,0 +1,72 @@
+//@version=5
+strategy("Trend Following with ADX and EMAs", overlay=true, 
+    default_qty_type=strategy.percent_of_equity, default_qty_value=99, 
+    initial_capital=1000, commission_type=strategy.commission.percent, 
+    commission_value=0.07)
+
+// ====== Inputs ======
+
+// Source
+src = input(close, title="Source")
+
+// EMA Parameters
+ema_short_length = input.int(50, minval=1, title="Short EMA Length", group="EMA Parameters")
+ema_long_length = input.int(200, minval=1, title="Long EMA Length", group="EMA Parameters")
+
+// ADX Parameters
+adx_length = input.int(14, minval=1, title="ADX Length", group="ADX Parameters")
+adx_threshold = input.float(25, minval=0, title="ADX Threshold", group="ADX Parameters")
+
+// Trade Direction
+use_longs = input.bool(true, title="Enable Long Positions", group="Trade Direction")
+use_shorts = input.bool(true, title="Enable Short Positions", group="Trade Direction")
+
+// Backtest Date Range
+start_date = input.time(timestamp("01 Jan 2017"), "Start Date", group="Backtest")
+end_date = input.time(timestamp("01 Jan 2025"), "End Date", group="Backtest")
+
+// ====== Calculations ======
+
+// Calcul des EMA
+ema_short = ta.ema(src, ema_short_length)
+ema_long = ta.ema(src, ema_long_length)
+
+// Calcul de l'ADX
+adx_value = ta.adx(adx_length)
+
+// Filtre de plage de dates
+in_date_range = (time >= start_date) and (time <= end_date)
+
+// ====== Strategy Logic ======
+
+if in_date_range
+    // Position Longue
+    if use_longs
+        long_condition = ta.crossover(ema_short, ema_long) and adx_value > adx_threshold and strategy.position_size == 0
+        if long_condition
+            strategy.entry(id="Long Entry", direction=strategy.long)
+    
+    if strategy.position_size > 0
+        exit_long_condition = ta.crossunder(ema_short, ema_long) or adx_value < adx_threshold
+        if exit_long_condition
+            strategy.close(id="Long Entry")
+    
+    // Position Courte
+    if use_shorts
+        short_condition = ta.crossunder(ema_short, ema_long) and adx_value > adx_threshold and strategy.position_size == 0
+        if short_condition
+            strategy.entry(id="Short Entry", direction=strategy.short)
+    
+    if strategy.position_size < 0
+        exit_short_condition = ta.crossover(ema_short, ema_long) or adx_value < adx_threshold
+        if exit_short_condition
+            strategy.close(id="Short Entry")
+
+// ====== Plotting ======
+
+// Tracé des EMA
+ema_short_plot = plot(ema_short, color=color.blue, linewidth=2, title="EMA Short")
+ema_long_plot = plot(ema_long, color=color.orange, linewidth=2, title="EMA Long")
+
+// Remplissage entre les EMA
+fill(ema_short_plot, ema_long_plot, color=ema_short > ema_long ? color.new(color.green, 90) : color.new(color.red, 90), title="EMA Fill")
