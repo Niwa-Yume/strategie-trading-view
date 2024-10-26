@@ -1,0 +1,89 @@
+//@version=5
+strategy("Ichimoku RSI Strategy", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=99, initial_capital=1000, commission_type=strategy.commission.percent, commission_value=0.07)
+
+// ====== Inputs ======
+
+// Source
+src = input(close, title="Source")
+
+// Ichimoku Parameters
+conversion_line_length = input.int(9, title="Tenkan-sen Length", group="Ichimoku")
+base_line_length = input.int(26, title="Kijun-sen Length", group="Ichimoku")
+lagging_span_length = input.int(52, title="Senkou Span B Length", group="Ichimoku")
+displacement = input.int(26, title="Displacement", group="Ichimoku")
+
+// RSI Parameters
+rsi_length = input.int(14, title="RSI Length", group="RSI")
+rsi_long_lower = input.float(30, title="RSI Long Lower Bound", group="RSI")
+rsi_long_upper = input.float(50, title="RSI Long Upper Bound", group="RSI")
+rsi_short_lower = input.float(50, title="RSI Short Lower Bound", group="RSI")
+rsi_short_upper = input.float(70, title="RSI Short Upper Bound", group="RSI")
+
+// Trade Direction
+use_longs = input.bool(true, title="Enable Long Positions", group="Trade Direction")
+use_shorts = input.bool(true, title="Enable Short Positions", group="Trade Direction")
+
+// Backtest Date Range
+start_date = input.time(timestamp("01 Jan 2017"), "Start Date", group="Backtest")
+end_date = input.time(timestamp("01 Jan 2025"), "End Date", group="Backtest")
+
+// ====== Calculations ======
+
+// Ichimoku Calculations
+tenkan_sen = (ta.highest(high, conversion_line_length) + ta.lowest(low, conversion_line_length)) / 2
+kijun_sen = (ta.highest(high, base_line_length) + ta.lowest(low, base_line_length)) / 2
+senkou_span_a = (tenkan_sen + kijun_sen) / 2
+senkou_span_b = (ta.highest(high, lagging_span_length) + ta.lowest(low, lagging_span_length)) / 2
+
+// Shifted Senkou Spans to align with current bar
+senkou_span_a_shifted = senkou_span_a[displacement]
+senkou_span_b_shifted = senkou_span_b[displacement]
+
+// Determine Cloud Boundaries
+cloud_top = math.max(senkou_span_a_shifted, senkou_span_b_shifted)
+cloud_bottom = math.min(senkou_span_a_shifted, senkou_span_b_shifted)
+
+// RSI Calculation
+rsi = ta.rsi(src, rsi_length)
+
+// Date Range Filter
+in_date_range = (time >= start_date) and (time <= end_date)
+
+// ====== Strategy Logic ======
+
+if in_date_range
+    // Long Position Entry
+    if use_longs and strategy.position_size == 0
+        long_condition = close > cloud_top and rsi >= rsi_long_lower and rsi <= rsi_long_upper
+        if long_condition
+            strategy.entry(id="Long Entry", direction=strategy.long)
+
+    // Long Position Exit
+    if strategy.position_size > 0
+        exit_long_condition = close < tenkan_sen or rsi > 60
+        if exit_long_condition
+            strategy.close(id="Long Entry")
+
+    // Short Position Entry
+    if use_shorts and strategy.position_size == 0
+        short_condition = close < cloud_bottom and rsi >= rsi_short_lower and rsi <= rsi_short_upper
+        if short_condition
+            strategy.entry(id="Short Entry", direction=strategy.short)
+
+    // Short Position Exit
+    if strategy.position_size < 0
+        exit_short_condition = close > tenkan_sen or rsi < 40
+        if exit_short_condition
+            strategy.close(id="Short Entry")
+
+// ====== Plotting ======
+
+// Ichimoku Lines
+tenkan_plot = plot(tenkan_sen, color=color.blue, title="Tenkan-sen")
+kijun_plot = plot(kijun_sen, color=color.orange, title="Kijun-sen")
+senkou_a_plot = plot(senkou_span_a, color=color.green, title="Senkou Span A", offset=displacement)
+senkou_b_plot = plot(senkou_span_b, color=color.red, title="Senkou Span B", offset=displacement)
+
+// Cloud Filling
+cloud_color = senkou_span_a_shifted > senkou_span_b_shifted ? color.new(color.green, 50) : color.new(color.red, 50)
+fill(senkou_a_plot, senkou_b_plot, color=cloud_color, title="Ichimoku Cloud")
